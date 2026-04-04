@@ -35,9 +35,11 @@ export const login = async (req, res) => {
         message: "Login correcto",
         token,
         user: {
-            id: user.id_usuario,
+            id_usuario: user.id_usuario,
+            id_empresa: user.id_empresa,
             email: user.correo,
-            cuenta: user.id_tipo_cuenta
+            cuenta: user.id_tipo_cuenta,
+
         }
         });
     } catch (error) {
