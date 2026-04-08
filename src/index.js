@@ -6,7 +6,9 @@ import authRoutes from "./routes/authRoutes.js";
 import  testRouters  from "./routes/testRoutes.js";
 import empresaRoutes from "./routes/empresaRoutes.js"
 import catalogoRoutes from "./routes/catalogoRoutes.js"
-
+import cargasRoutes from "./routes/cargasRoutes.js"
+import procesosRoutes from "./routes/procesosRoutes.js"
+import reportesRoutes from "./routes/reportesRoutes.js"
 
 
 
@@ -32,6 +34,12 @@ app.use("/api", testRouters);
 app.use(empresaRoutes);
 
 app.use(catalogoRoutes);
+
+app.use(cargasRoutes);
+
+app.use(procesosRoutes);
+
+app.use(reportesRoutes);
 
 app.listen(PORT, () => {
     console.log(`Servidor corriendo en puerto ${PORT}`);

@@ -1,5 +1,5 @@
 import pool from "../config/db.js";
-
+import bcrypt from "bcrypt";
 
 
 export const DatosGeneralesUsuario = async (req, res) => {
@@ -154,18 +154,20 @@ export const InfoDomi = async (req,res) =>{
 export const RegistroUsuario = async (req, res) => {
     try {
         const envioUsuario = req.body;
-        //console.log("Datos recibidos Envio materiales:", JSON.stringify(envioUsuario, null, 2));
+        //console.log("Datos recibidos REGISTRO_USER:", JSON.stringify(envioUsuario, null, 2));
         // Verificar si ya existe un usuario con el mismo correo
-        const correoExisteQuery = `SELECT 1 FROM cuenta_usuario WHERE corrreo = $1`;
+        const correoExisteQuery = `SELECT 1 FROM usuario WHERE correo = $1`;
         const { rows } = await pool.query(correoExisteQuery, [envioUsuario.correo]);
 
         if (rows.length > 0) {
             return res.status(400).json({ error: "El correo ya está registrado." });
         }
 
+        const hashedPassword = await bcrypt.hash(envioUsuario.contraseña, 10);
+
         const envioUsuarioQuery = `
-            INSERT INTO cuenta_usuario
-            (id_empresa, nombre, corrreo, telefono, contraseña, tipo_de_cuenta, id_domicilio)
+            INSERT INTO usuario
+            (id_empresa, nombre, correo, telefono, password_hash, id_tipo_cuenta, id_domicilio)
             VALUES 
             ($1, $2, $3, $4, $5, $6, $7)
         `;
@@ -174,13 +176,14 @@ export const RegistroUsuario = async (req, res) => {
             envioUsuario.nombre,
             envioUsuario.correo,
             envioUsuario.telefono,
-            envioUsuario.contraseña,
+            hashedPassword,
             envioUsuario.rol,
             envioUsuario.domicilioId,
         ];
         await pool.query(envioUsuarioQuery, envioUsuarioValues);
 
         res.status(200).json({ message: "Usuario registrado exitosamente" });
+        
     } catch (error) {
         console.error("Error al registrar usuario:", error);
         res.status(500).json({ error: "Error interno del servidor" });

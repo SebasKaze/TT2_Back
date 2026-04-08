@@ -39,6 +39,7 @@ export const login = async (req, res) => {
             id_empresa: user.id_empresa,
             email: user.correo,
             cuenta: user.id_tipo_cuenta,
+            domicilio: user.id_domicilio,
 
         }
         });
