@@ -144,7 +144,7 @@ export const eliminarMaterial = async (req, res) => {
 
 //PRODUCTOS
 export const cargaProducto = async (req,res)=>{
-    const data = req.body;
+    //const data = req.body;
     //console.log("Datos recibidos CARGA PRODUCTO:", JSON.stringify(data, null, 2));
     
     try{
@@ -183,15 +183,17 @@ export const cargaProducto = async (req,res)=>{
             const id_material = materialResult.rows[0].id_material; // ID real del material
             const envioBilleteQuery = `
                 INSERT INTO bom
-                (id_material, id_producto, cantidad)
+                (id_material, id_producto, merma, cantidad)
                 VALUES 
-                ($1, $2, $3)
+                ($1, $2, $3, $4)
                 RETURNING *;
             `;
+            //Arreglar la carga de merma tanto en back como en front
             const envioBilleteValues = [
                 id_material,
                 id_producto,
-                material.cantidad
+                material.cantidad,
+                "%merma" 
             ];
 
             const envioBilletePush = await pool.query(envioBilleteQuery, envioBilleteValues);

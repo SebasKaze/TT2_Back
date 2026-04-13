@@ -11,6 +11,10 @@ import {
 
 } from "../controllers/cargasController.js";
 
+import {
+    envioPedimento
+} from "../controllers/opePedimentoController.js"
+
 const router = express.Router();
 
 router.get("/api/pedimento/verpedi", verPedimentos);
