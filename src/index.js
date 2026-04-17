@@ -9,7 +9,7 @@ import catalogoRoutes from "./routes/catalogoRoutes.js"
 import cargasRoutes from "./routes/cargasRoutes.js"
 import procesosRoutes from "./routes/procesosRoutes.js"
 import reportesRoutes from "./routes/reportesRoutes.js"
-
+import pedimentoRoutes from "./routes/pedimentoRoutes.js"
 
 
 
@@ -40,6 +40,8 @@ app.use(cargasRoutes);
 app.use(procesosRoutes);
 
 app.use(reportesRoutes);
+
+app.use(pedimentoRoutes);
 
 app.listen(PORT, () => {
     console.log(`Servidor corriendo en puerto ${PORT}`);

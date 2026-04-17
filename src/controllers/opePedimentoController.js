@@ -21,7 +21,7 @@ export const envioPedimento = async (req, res) => {
         //|||||||||||||||||||||||||||||
         if(seccion1.tipoOperacion === "IMP"){
             //Verifica si existen las fracciones en los materiales
-            const { rowsfra } = await pool.query (`
+            const { rows:rowsfra } = await pool.query (`
                 SELECT 
                     fraccion_arancelaria, subd 
                 FROM 
@@ -234,7 +234,7 @@ export const envioPedimento = async (req, res) => {
                         insertedNoPedimento, 
                         seccion.sec, 
                         seccion.fraccion || null, 
-                        seccion.subd || null, 
+                        seccion.Subd || null, 
                         seccion.vinc || null, 
                         seccion.MetS7P || null,
                         seccion.UMCS7P || null, 
@@ -265,7 +265,7 @@ export const envioPedimento = async (req, res) => {
 
                     const saldoQuery = `
                         INSERT INTO saldo (no_pedimento, cantidad, fraccion, fecha_sal)
-                        VALUES ($1,$2,$3,$4,$5,$6)
+                        VALUES ($1,$2,$3,$4)
                         RETURNING id_saldo;
                     `;
                     const saldoValues = [
@@ -321,11 +321,11 @@ export const envioPedimento = async (req, res) => {
             INSERT INTO suma (
                 fracc, cant_total, fecha_ped, no_pedimento, estado)
                 VALUES (
-                $1, $2, $3, $4)
+                $1, $2, $3, $4, $5)
                 RETURNING *;
             `;
             const restaQuery = `
-                INSERT INTO resta_saldo_mu (fraccion,cant_restante,idd_suma,idd_mu) 
+                INSERT INTO resta_suma_mu (fraccion,cant_restante,idd_suma,idd_mu) 
                 VALUES ($1, $2, $3, $4)
             `;
             const sumaPorFraccion = new Map();
@@ -339,19 +339,19 @@ export const envioPedimento = async (req, res) => {
             }
             for (const [fraccion, total] of sumaPorFraccion) {
 
-                const sumaResultado = await pool.query(sumaQuery, [
+                const sumaResultado = await client.query(sumaQuery, [
                     fraccion,
                     total,
-                    seccion1.fechaSalida,,
-                    insertedNoPedimento,
+                    seccion1.fechaSalida,
+                    insertedNoPedimento, 
                     1
                 ]);
 
                 const id_suma = sumaResultado.rows[0].id_suma;
-                await pool.query(restaQuery, [
+                await client.query(restaQuery, [
                     fraccion,
                     total,
-                    id_suma,
+                    id_suma, 
                     0
                 ]);
             }           
@@ -421,135 +421,15 @@ export const envioPedimento = async (req, res) => {
 
             // **Confirmar la transacción**
             await client.query("COMMIT");
-            
+
+            console.log("Pedimento y datos relacionados insertados correctamente");
+            res.status(201).json({ message: "Pedimento insertado correctamente", no_pedimento: insertedNoPedimento });
         }
         //|||||||||||||||||||||||||||||
         //|||||||PEDIMENTO EXP|||||||||
         //|||||||||||||||||||||||||||||
         if(seccion1.tipoOperacion === "EXP"){
-            //Verifica si existen las fracciones en los productos
-            const { rows: rowsfra } = await pool.query(`
-                SELECT 
-                    id_producto,
-                    fraccion_arancelaria,
-                    subd
-                FROM producto
-                WHERE id_empresa = $1
-                AND id_domicilio = $2
-            `, [id_empresa, id_domicilio]);
-
-            const desperdicioQuery = `
-                INSERT INTO desperdicio
-                (no_fraccion, fraccion, descrip, cantidad, tipo, subd)
-                VALUES ($1, $2, $3, $4, $5, $6)
-            `;
-
-            const materialUtilizadoQuery = `
-                INSERT INTO material_utilizado
-                (id_transformacion, id_material, cantidad)
-                VALUES ($1, $2, $3)
-                RETURNING id_mu
-            `;
-
-            const transformacionQuery = `
-                INSERT INTO transformacion
-                (id_producto, fecha_transformacion, cantidad, no_pedimento, id_partida)
-                VALUES ($1, NOW(), $2, $3, $4)
-                RETURNING id_transformacion
-            `;
-
-            const productosMap = new Map(
-                rowsfra.map(item => [
-                    `${item.fraccion_arancelaria}-${item.subd}`,
-                    item.id_producto
-                ])
-            );
-
-            for (const fraccionPartida of seccion7) {
-                const clave = `${fraccionPartida.fraccion}-${fraccionPartida.Subd}`;
-                const cantidadFabricada = Number(fraccionPartida.CantiUMCS7P || 0);
-
-                const idProducto = productosMap.get(clave);
-
-                if (!idProducto) {
-                    const desperdicioValues = [
-                        seccion1.noPedimento,
-                        fraccionPartida.fraccion,
-                        "Desperdicio o merma",
-                        cantidadFabricada,
-                        "Desperdicio",
-                        fraccionPartida.Subd
-                    ];
-
-                    await pool.query(desperdicioQuery, desperdicioValues);
-                    continue;
-                }
-
-                // ✅ 1) Crear transformación
-                const { rows: transformacionRows } = await pool.query(
-                    transformacionQuery,
-                    [
-                        idProducto,
-                        cantidadFabricada,
-                        seccion1.noPedimento,
-                        fraccionPartida.sec
-                    ]
-                );
-
-                const idTransformacion = transformacionRows[0].id_transformacion;
-
-                // ✅ 2) Obtener materiales del BOM
-                const { rows: materiales } = await pool.query(`
-                    SELECT id_material, cantidad, merma_por
-                    FROM bom
-                    WHERE id_producto = $1
-                `, [idProducto]);
-
-                for (const material of materiales) {
-                    const cantidadBom = Number(material.cantidad || 0);
-                    const mermaPor = Number(material.merma_por || 0);
-
-                    const cantidadUsada = cantidadBom * cantidadFabricada;
-                    const merma = cantidadUsada * (mermaPor / 100);
-                    const totalMaterial = cantidadUsada + merma;
-
-                    // ✅ Guardar material utilizado
-                    await pool.query(materialUtilizadoQuery, [
-                        idTransformacion,
-                        material.id_material,
-                        totalMaterial
-                    ]);
-
-                    // ✅ Guardar desperdicio
-                    await pool.query(desperdicioQuery, [
-                        seccion1.noPedimento,
-                        fraccionPartida.fraccion,
-                        `Material ${material.id_material} usado con merma ${mermaPor}%`,
-                        merma,
-                        "Merma BOM",
-                        fraccionPartida.Subd
-                    ]);
-
-
-                    const { rows: muRows } = await client.query(
-                        materialUtilizadoQuery,
-                        [idTransformacion, material.id_material, totalMaterial]
-                    );
-
-                    const idMaterialUtilizado = muRows[0].id_mu;
-
-                    await consumirMaterialFIFO(
-                        client,
-                        material.fraccion,
-                        totalMaterial,
-                        idMaterialUtilizado,
-                        fraccionPartida.Subd
-                    );
-                }
-            }
-
-
-
+            
             // **Insertar en pedimento (tabla principal)**
             const pedimentoQuery = `
                 INSERT INTO pedimento (no_pedimento, tipo_oper, clave_ped, id_empresa, id_usuario, fecha_hora,id_domicilio)
@@ -847,6 +727,130 @@ export const envioPedimento = async (req, res) => {
                 insertedNoPedimento
             ];
 
+
+
+            //Verifica si existen las fracciones en los productos
+            const { rows: rowsfra } = await pool.query(`
+                SELECT 
+                    id_producto,
+                    fraccion_arancelaria,
+                    subd
+                FROM producto
+                WHERE id_empresa = $1
+                AND id_domicilio = $2
+            `, [id_empresa, id_domicilio]);
+
+            const desperdicioQuery = `
+                INSERT INTO desperdicio
+                (no_fraccion, fraccion, descrip, cantidad, tipo, subd)
+                VALUES ($1, $2, $3, $4, $5, $6)
+            `;
+
+            const materialUtilizadoQuery = `
+                INSERT INTO material_utilizado
+                (id_transformacion, id_material, cantidad)
+                VALUES ($1, $2, $3)
+                RETURNING id_uso
+            `;
+
+            const transformacionQuery = `
+                INSERT INTO transformacion
+                (id_producto, fecha_transformacion, cantidad, no_pedimento, sec_partida)
+                VALUES ($1, NOW(), $2, $3, $4)
+                RETURNING id_transformacion
+            `;
+
+            const productosMap = new Map(
+                rowsfra.map(item => [
+                    `${item.fraccion_arancelaria}-${item.subd}`,
+                    item.id_producto
+                ])
+            );
+
+            for (const fraccionPartida of seccion7) {
+                const clave = `${fraccionPartida.fraccion}-${fraccionPartida.Subd}`;
+                const cantidadFabricada = Number(fraccionPartida.CantiUMCS7P || 0);
+
+                const idProducto = productosMap.get(clave);
+
+                if (!idProducto) {
+                    const desperdicioValues = [
+                        insertedNoPedimento,
+                        fraccionPartida.fraccion,
+                        "Desperdicio o merma",
+                        cantidadFabricada,
+                        "Desperdicio",
+                        fraccionPartida.Subd
+                    ];
+
+                    await client.query(desperdicioQuery, desperdicioValues);
+                    continue;
+                }
+
+                // ✅ 1) Crear transformación 
+                const { rows: transformacionRows } = await client.query(
+                    transformacionQuery,
+                    [
+                        idProducto,
+                        cantidadFabricada,
+                        insertedNoPedimento,
+                        fraccionPartida.sec
+                    ]
+                );
+
+                const idTransformacion = transformacionRows[0].id_transformacion;
+
+                // ✅ 2) Obtener materiales del BOM
+                const { rows: materiales } = await client.query(`
+                    SELECT 
+                        b.id_material,
+                        b.cantidad,
+                        b.merma_por,
+                        m.fraccion_arancelaria,
+                        m.subd
+                    FROM bom b
+                    JOIN material m
+                        ON m.id_material = b.id_material
+                    WHERE b.id_producto = $1
+                `, [idProducto]);
+
+                for (const material of materiales) {
+                    const cantidadBom = Number(material.cantidad || 0);
+                    const mermaPor = Number(material.merma_por || 0);
+
+                    const cantidadUsada = cantidadBom * cantidadFabricada;
+                    const merma = cantidadUsada * (mermaPor / 100);
+                    const totalMaterial = cantidadUsada + merma;
+                    
+                    // ✅ Guardar desperdicio
+                    await client.query(desperdicioQuery, [
+                        insertedNoPedimento,
+                        fraccionPartida.fraccion,
+                        `Material ${material.id_material} usado con merma ${mermaPor}%`,
+                        merma,
+                        "Merma BOM",
+                        fraccionPartida.Subd
+                    ]);
+
+
+                    const { rows: muRows } = await client.query(
+                        materialUtilizadoQuery,
+                        [idTransformacion, material.id_material, totalMaterial]
+                    );
+
+                    const idMaterialUtilizado = muRows[0].id_uso;
+
+                    await consumirMaterialFIFO(
+                        client,
+                        material.fraccion_arancelaria,
+                        totalMaterial,
+                        idMaterialUtilizado,
+                        material.subd
+                    );
+                }
+            }
+
+
             const encaPPush = await client.query(encaPQuery, encaPValues); 
             const encaSecPush = await client.query(encaSecQuery, encaSecValues);
             const datosProveComPush = await client.query(datosProveComQuery, datosProveComValues);
@@ -857,11 +861,11 @@ export const envioPedimento = async (req, res) => {
 
             // **Confirmar la transacción**
             await client.query("COMMIT");
-            
+            console.log("Pedimento y datos relacionados insertados correctamente");
+            res.status(201).json({ message: "Pedimento insertado correctamente", no_pedimento: insertedNoPedimento });
         }
 
-        console.log("Pedimento y datos relacionados insertados correctamente");
-        res.status(201).json({ message: "Pedimento insertado correctamente", no_pedimento: insertedNoPedimento });
+        
     } catch (error) {
         if (client) await client.query("ROLLBACK");
         console.error("Error al insertar pedimento:", error);
@@ -880,12 +884,12 @@ export const envioPedimento = async (req, res) => {
         subd
     ) {
         let restante = cantidadNecesaria;
-
+        console.log("DatosRecibidos:", fraccion, subd);
         while (restante > 0) {
             // 1) Buscar saldo actual más reciente en RESTA
             const { rows: saldoRows } = await client.query(`
                 SELECT idd_suma, cant_restante
-                FROM resta_saldo_mu
+                FROM resta_suma_mu
                 WHERE fraccion = $1
                 AND subd = $2
                 ORDER BY id_resta DESC
@@ -905,7 +909,7 @@ export const envioPedimento = async (req, res) => {
                 const nuevoSaldo = saldoActual - restante;
 
                 await client.query(`
-                    INSERT INTO resta_saldo_mu
+                    INSERT INTO resta_suma_mu
                     (fraccion, cant_restante, idd_suma, idd_mu, subd)
                     VALUES ($1, $2, $3, $4, $5)
                 `, [fraccion, nuevoSaldo, iddSuma, idMaterialUtilizado, subd]);
@@ -920,17 +924,17 @@ export const envioPedimento = async (req, res) => {
             // marcar lote anterior agotado
             if (iddSuma) {
                 await client.query(`
-                    UPDATE suma_saldo_mu
-                    SET estado = 'agotado'
+                    UPDATE suma
+                    SET estado = 2
                     WHERE idd_suma = $1
                 `, [iddSuma]);
             }
 
             // buscar siguiente lote FIFO
             const { rows: siguienteRows } = await client.query(`
-                SELECT idd_suma, cant_total
-                FROM suma_saldo_mu
-                WHERE fraccion = $1
+                SELECT id_suma, cant_total
+                FROM suma
+                WHERE fracc = $1
                 AND subd = $2
                 AND estado = 'disponible'
                 ORDER BY fecha_ped ASC
@@ -947,9 +951,9 @@ export const envioPedimento = async (req, res) => {
             if (nuevoSaldo < 0) {
                 // consumir completamente este lote
                 await client.query(`
-                    UPDATE suma_saldo_mu
-                    SET estado = 'agotado'
-                    WHERE idd_suma = $1
+                    UPDATE suma
+                    SET estado = 2
+                    WHERE id_suma = $1
                 `, [siguiente.idd_suma]);
 
                 restante = Math.abs(nuevoSaldo);
@@ -958,13 +962,13 @@ export const envioPedimento = async (req, res) => {
 
             // registrar nuevo saldo restante
             await client.query(`
-                INSERT INTO resta_saldo_mu
+                INSERT INTO resta_suma_mu
                 (fraccion, cant_restante, idd_suma, idd_mu, subd)
                 VALUES ($1, $2, $3, $4, $5)
             `, [
                 fraccion,
                 nuevoSaldo,
-                siguiente.idd_suma,
+                siguiente.idd_suma, 
                 idMaterialUtilizado,
                 subd
             ]);
@@ -972,10 +976,10 @@ export const envioPedimento = async (req, res) => {
             // si quedó en 0 -> agotado
             if (nuevoSaldo === 0) {
                 await client.query(`
-                    UPDATE suma_saldo_mu
-                    SET estado = 'agotado'
-                    WHERE idd_suma = $1
-                `, [siguiente.idd_suma]);
+                    UPDATE suma
+                    SET estado = 2
+                    WHERE id_suma = $1
+                `, [siguiente.id_suma]);
             }
 
             restante = 0;

@@ -6,7 +6,7 @@ import {
     mateCargaProducto,
     mateCargaMeteriales,
     mateCargaGuardar,
-    mateUtilizados,
+    prodCreado,
     saldoMuestra
 } from '../controllers/procesosController.js'
 
@@ -21,7 +21,7 @@ router.get("/api/procesos/mateutili/cargamateriales", mateCargaMeteriales); //Ha
 
 router.post("/api/procesos/mateutili/guardar", mateCargaGuardar); //Guardar material utilizado
 
-router.get("/api/procesos/mateutili", mateUtilizados); //Hacer la consulta de Materiales Utilizados
+router.get("/api/procesos/mateutili", prodCreado); //Hacer la consulta de Materiales Utilizados
 
 router.get("/api/procesos/saldoMuestra", saldoMuestra); //Mostrar el saldo actual
 

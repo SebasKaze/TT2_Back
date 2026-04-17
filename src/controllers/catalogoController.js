@@ -11,9 +11,9 @@ export const cargaMaterial = async (req,res)=>{
         const envioMaterial = req.body;
         const envioMaterialQuery = `
             INSERT INTO material
-            (id_material_interno, fraccion_arancelaria, id_empresa, nombre_interno, descripcion_fraccion,id_unidad,id_domicilio)
+            (id_material_interno, fraccion_arancelaria, id_empresa, nombre_interno, descripcion_fraccion,id_unidad,id_domicilio, subd)
             VALUES 
-            ($1, $2, $3, $4, $5, $6, $7)
+            ($1, $2, $3, $4, $5, $6, $7, $8)
             RETURNING *;
         `; 
         const envioMaterialValues = [
@@ -24,6 +24,7 @@ export const cargaMaterial = async (req,res)=>{
             envioMaterial.descripcionFraccion,
             1,
             envioMaterial.id_domicilio,
+            envioMaterial.subd,
         ];
         await pool.query(envioMaterialQuery,envioMaterialValues);
         const data = "Datos Cargados";
@@ -47,7 +48,7 @@ export const verMateriales = async (req, res) =>{
     try {
         const { rows } = await pool.query(`
             SELECT 
-                id_material_interno, fraccion_arancelaria, nombre_interno, descripcion_fraccion, id_unidad
+                id_material_interno, fraccion_arancelaria, nombre_interno, descripcion_fraccion, id_unidad, subd
             FROM 
                 material
             WHERE 
@@ -144,16 +145,16 @@ export const eliminarMaterial = async (req, res) => {
 
 //PRODUCTOS
 export const cargaProducto = async (req,res)=>{
-    //const data = req.body;
-    //console.log("Datos recibidos CARGA PRODUCTO:", JSON.stringify(data, null, 2));
-    
+    const data = req.body;
+    console.log("Datos recibidos CARGA PRODUCTO:", JSON.stringify(data, null, 2));
+    /*
     try{
         const envioProducto = req.body;
         const envioProductoQuery = `
             INSERT INTO producto
-            (id_producto_interno, fraccion_arancelaria, id_empresa, nombre_interno, descripcion,id_unidad, id_domicilio)
+            (id_producto_interno, fraccion_arancelaria, id_empresa, nombre_interno, descripcion,id_unidad, id_domicilio, subd)
             VALUES 
-            ($1, $2, $3, $4, $5, $6, $7)
+            ($1, $2, $3, $4, $5, $6, $7, $8)
             RETURNING *;
         `;
         const envioProductoValues = [
@@ -164,6 +165,7 @@ export const cargaProducto = async (req,res)=>{
             envioProducto.descripcion,
             1,
             envioProducto.id_domicilio,
+            envioProducto.subd,
         ];
         const envioProductoPush = await pool.query(envioProductoQuery,envioProductoValues);
         const id_producto = envioProductoPush.rows[0].id_producto;
@@ -193,7 +195,7 @@ export const cargaProducto = async (req,res)=>{
                 id_material,
                 id_producto,
                 material.cantidad,
-                "%merma" 
+                material.merma,
             ];
 
             const envioBilletePush = await pool.query(envioBilleteQuery, envioBilleteValues);
@@ -209,8 +211,8 @@ export const cargaProducto = async (req,res)=>{
         if (!res.headersSent) {
             return res.status(500).json({ error: "Error interno del servidor" });
         }    
-    }
-    
+    }  
+    */
 };
 
 export const verProductos = async (req, res) =>{
@@ -221,7 +223,7 @@ export const verProductos = async (req, res) =>{
     try {
         const { rows } = await pool.query(`
             SELECT 
-                id_producto_interno, fraccion_arancelaria, nombre_interno, descripcion, id_unidad
+                id_producto_interno, fraccion_arancelaria, nombre_interno, descripcion, id_unidad, subd
             FROM 
                 producto
             WHERE 
@@ -291,7 +293,7 @@ export const verBillete = async (req, res) => {
     try {
         const { rows } = await pool.query(`
             SELECT 
-                id_material_interno, cantidad
+                id_material_interno, cantidad, merma
             FROM 
                 billete_de_materiales
             WHERE 

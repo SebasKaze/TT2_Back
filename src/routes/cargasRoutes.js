@@ -1,6 +1,5 @@
 import express from "express";
 import {
-    envioPedimento,
     verPedimentos,
     editarPedimento,  // Importamos el nuevo controlador
     activoFijo,

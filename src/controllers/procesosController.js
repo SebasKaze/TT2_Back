@@ -114,53 +114,7 @@ export const mateCargaProducto = async (req, res) => {
 
 };
 
-export const mateCargaMeteriales = async (req, res) => {
-    try {
-        const id_producto = req.query.id_producto || req.query.producto;
-        
-        if (!id_producto) {
-            return res.status(400).json({ error: "El parámetro id_producto es obligatorio" });
-        }
 
-        const query1 = `
-            SELECT 
-                id_material,
-                id_material_interno
-            FROM 
-                bom
-            WHERE 
-                id_producto = $1
-        `;
-        const values1 = [id_producto];
-        const { rows: materiales } = await pool.query(query1, values1);
-
-        if (materiales.length === 0) {
-            return res.json([]);
-        }
-
-        const materialIds = materiales.map(m => m.id_material);
-        const query2 = `
-            SELECT id_material, nombre_interno 
-            FROM material
-            WHERE id_material = ANY($1)
-        `;
-        const values2 = [materialIds];
-        const { rows: nombres } = await pool.query(query2, values2);
-        const nombreMap = {};
-        nombres.forEach(({ id_material, nombre_interno }) => {
-            nombreMap[id_material] = nombre_interno;
-        });
-        const resultado = materiales.map(mat => ({
-            id_material: mat.id_material,
-            id_meterial_interno: mat.id_meterial_interno,
-            nombre_interno: nombreMap[mat.id_material] || null
-        }));
-        res.json(resultado);
-    } catch (error) {
-        console.error("Error al obtener datos:", error);
-        res.status(500).json({ error: "Error interno del servidor" });
-    }
-};
 
     export const mateCargaGuardar = async (req, res) => {
         const data = req.body;
@@ -313,48 +267,115 @@ export const mateCargaMeteriales = async (req, res) => {
     };
     
     
-export const mateUtilizados = async (req, res) => {
-    try {
-        const { id_empresa, id_domicilio } = req.query;
 
-        if (!id_empresa || !id_domicilio) {
-            return res.status(400).json({ error: "Parámetros id_empresa e id_domicilio son obligatorios" });
+export const mateCargaMeteriales = async (req, res) => {
+    try {
+        const { id_transformacion } = req.query;
+
+        if (!id_transformacion) {
+            return res.status(400).json({
+                error: "id_transformacion es obligatorio"
+            });
         }
 
         const query = `
-            SELECT 
-                nombre,
-                cantidad,
-                fecha_transformacion
-            FROM 
-                transformacion
-            WHERE
-                id_empresa = $1 AND id_domicilio = $2
-            ;
+            SELECT
+                mu.id_material,
+                m.id_material_interno,
+                m.nombre_interno,
+                m.fraccion_arancelaria,
+                m.subd,
+                mu.cantidad
+            FROM material_utilizado mu
+            INNER JOIN material m
+                ON mu.id_material = m.id_material
+            WHERE mu.id_transformacion = $1
+            ORDER BY m.nombre_interno;
         `;
-        const values = [id_empresa, id_domicilio];
-        const { rows } = await pool.query(query, values);
+
+        const { rows } = await pool.query(query, [id_transformacion]);
+
         res.json(rows);
+
     } catch (error) {
-        console.error("Error al obtener datos:", error);
+        console.error("Error al obtener materiales utilizados:", error);
         res.status(500).json({ error: "Error interno del servidor" });
     }
 };
-export const saldoMuestra = async (req, res) => {
+
+
+
+export const prodCreado = async (req, res) => {
     try {
         const { id_empresa, id_domicilio } = req.query;
 
         if (!id_empresa || !id_domicilio) {
-            return res.status(400).json({ error: "Parámetros id_empresa e id_domicilio son obligatorios" });
+            return res.status(400).json({
+                error: "Parámetros id_empresa e id_domicilio son obligatorios"
+            });
+        }
+
+        const query = `
+            SELECT
+                t.id_transformacion,
+                t.no_pedimento,
+                p.id_producto_interno,
+                p.nombre_interno,
+                p.fraccion_arancelaria,
+                t.sec_partida,
+                t.cantidad,
+                t.fecha_transformacion
+            FROM transformacion t
+            INNER JOIN producto p
+                ON t.id_producto = p.id_producto
+            INNER JOIN pedimento ped
+                ON t.no_pedimento = ped.no_pedimento
+            WHERE ped.id_empresa = $1
+              AND ped.id_domicilio = $2
+              AND ped.tipo_oper = 'EXP'
+            ORDER BY t.fecha_transformacion DESC;
+        `;
+
+        const { rows } = await pool.query(query, [
+            id_empresa,
+            id_domicilio
+        ]);
+
+        if (rows.length === 0) {
+            return res.json({ mensaje: "No se encontraron productos creados" });
+        }
+
+        res.json(rows);
+
+    } catch (error) {
+        console.error("Error al obtener productos creados:", error);
+        res.status(500).json({ error: "Error interno del servidor" });
+    }
+};
+
+
+export const saldoMuestra = async (req, res) => {
+    try {
+        const { id_empresa, id_domicilio, selector } = req.query;
+
+        if (!id_empresa || !id_domicilio || !selector) {
+            return res.status(400).json({
+                error: "Parámetros id_empresa, id_domicilio y selector son obligatorios"
+            });
         }
 
         const queryPedimentos = `
             SELECT no_pedimento
             FROM pedimento
-            WHERE id_empresa = $1 AND id_domicilio = $2;
+            WHERE id_empresa = $1
+            AND id_domicilio = $2
+            AND tipo_oper = 'IMP';
         `;
-        const values = [id_empresa, id_domicilio];
-        const resultPedimentos = await pool.query(queryPedimentos, values);
+
+        const resultPedimentos = await pool.query(queryPedimentos, [
+            id_empresa,
+            id_domicilio
+        ]);
 
         if (resultPedimentos.rows.length === 0) {
             return res.json({ mensaje: "No se encontraron pedimentos" });
@@ -362,38 +383,109 @@ export const saldoMuestra = async (req, res) => {
 
         let resultados = [];
 
-        for (const row of resultPedimentos.rows) {
-            const no_pedimento = row.no_pedimento;
+        for (const pedimentoRow of resultPedimentos.rows) {
+            const no_pedimento = pedimentoRow.no_pedimento;
 
-            const queryFraccion = `
-                SELECT fraccion
-                FROM saldo
-                WHERE no_pedimento = $1;
-            `;
-            const fraccionResult = await pool.query(queryFraccion, [no_pedimento]);
+            // ==========================
+            // SELECTOR 1
+            // Fracciones sin utilizar
+            // ==========================
+            if (Number(selector) === 1) {
+                const queryFracciones = `
+                    SELECT id_suma, fracc, subd, cant_total
+                    FROM suma
+                    WHERE no_pedimento = $1
+                    AND estado = '1';
+                `;
 
-            if (fraccionResult.rows.length === 0) {
-                continue;
+                const fracciones = await pool.query(queryFracciones, [no_pedimento]);
+
+                for (const fraccionRow of fracciones.rows) {
+                    const { id_suma, fracc, subd, cant_total } = fraccionRow;
+
+                    const queryUso = `
+                        SELECT 1
+                        FROM resta_suma_mu
+                        WHERE idd_suma = $1
+                        LIMIT 1;
+                    `;
+
+                    const uso = await pool.query(queryUso, [id_suma]);
+
+                    // Si no existe, nunca se ha usado
+                    if (uso.rows.length === 0) {
+                        resultados.push({
+                            no_pedimento,
+                            fraccion: `${fracc}-${subd}`,
+                            cantidad_total: cant_total
+                        });
+                    }
+                }
             }
 
-            const fraccion = fraccionResult.rows[0].fraccion;
-            const queryRestaSaldo = `
-                SELECT restante
-                FROM resta_saldo_mu
-                WHERE no_pedimento = $1
-                ORDER BY id_resta DESC
-                LIMIT 1;
-            `;
-            const resultRestaSaldo = await pool.query(queryRestaSaldo, [no_pedimento]);
+            // ==========================
+            // SELECTOR 2
+            // Fracciones agotadas
+            // ==========================
+            if (Number(selector) === 2) {
+                const queryFracciones = `
+                    SELECT fracc, subd
+                    FROM suma
+                    WHERE no_pedimento = $1
+                    AND estado = '2';
+                `;
 
-            if (resultRestaSaldo.rows.length > 0) {
-                let resta = parseFloat(resultRestaSaldo.rows[0].restante) || 0;
-                resultados.push({ no_pedimento, fraccion, resta });
+                const fracciones = await pool.query(queryFracciones, [no_pedimento]);
+
+                for (const fraccionRow of fracciones.rows) {
+                    resultados.push({
+                        no_pedimento,
+                        fraccion: `${fraccionRow.fracc}-${fraccionRow.subd}`
+                    });
+                }
+            }
+
+            // ==========================
+            // SELECTOR 3
+            // Fracciones con saldo restante
+            // ==========================
+            if (Number(selector) === 3) {
+                const queryFracciones = `
+                    SELECT id_suma, fracc, subd
+                    FROM suma
+                    WHERE no_pedimento = $1
+                    AND estado = '1';
+                `;
+
+                const fracciones = await pool.query(queryFracciones, [no_pedimento]);
+
+                for (const fraccionRow of fracciones.rows) {
+                    const { id_suma, fracc, subd } = fraccionRow;
+
+                    const queryRestaSaldo = `
+                        SELECT cant_restante
+                        FROM resta_suma_mu
+                        WHERE idd_suma = $1
+                        ORDER BY id_resta DESC
+                        LIMIT 1;
+                    `;
+
+                    const resultRestaSaldo = await pool.query(queryRestaSaldo, [id_suma]);
+
+                    if (resultRestaSaldo.rows.length > 0) {
+                        resultados.push({
+                            no_pedimento,
+                            fraccion: `${fracc}-${subd}`,
+                            cantidad_restante: resultRestaSaldo.rows[0].cant_restante
+                        });
+                    }
+                }
             }
         }
 
-        console.log("Resultados enviados al frontend:", resultados);
+        //console.log("Resultados enviados al frontend:", resultados);
         res.json(resultados);
+
     } catch (error) {
         console.error("Error al obtener datos:", error);
         res.status(500).json({ error: "Error interno del servidor" });
