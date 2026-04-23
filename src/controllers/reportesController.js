@@ -31,7 +31,7 @@ export const entradaMercanciaReporteExcel = async (req, res) => {
             FROM 
                 domicilio
             WHERE 
-                id_empresa = $1 AND id_tipo_domicilio = 1;
+                id_empresa = $1 AND id_tipo_domicilio = 2;
         `;
         const valuesDom = [id_empresa];
         const { rows: domicilioData } = await pool.query(queryDom, valuesDom);
@@ -42,9 +42,13 @@ export const entradaMercanciaReporteExcel = async (req, res) => {
                 p.no_pedimento, 
                 p.clave_ped,
                 TO_CHAR(e.feca_sal, 'YYYY-MM-DD') AS fecha_en,
-                pa.fraccion,
+                pa.fraccion,pa.subd,pa.met_val,pa.id_umc,
                 pa.cantidad_umc,
-                pa.descripcion
+                pa.descripcion,
+                pa.id_umt,pa.cantidad_umt,pa.precio_unit
+
+
+
             FROM 
                 pedimento p
             JOIN pedimento_encabezado e ON p.no_pedimento = e.no_pedimento
@@ -78,7 +82,7 @@ export const entradaMercanciaReporteExcel = async (req, res) => {
         worksheet.addRow([]); // Fila en blanco para separación
 
         // Definir encabezados de la tabla
-        const headers = ["Pedimento", "Clave de pedimento", "Fecha", "Fracción", "Cantidad UMC", "Descripcion"];
+        const headers = ["Pedimento", "Clave de pedimento", "Fecha", "Fracción","subd","met_val", "id_umc","Cantidad UMC", "Descripcion","id_umt","cantidad_umt","precio_unit"];
         worksheet.addRow(headers).font = { bold: true };
 
         // Agregar filas con los datos de la tabla
@@ -92,8 +96,14 @@ export const entradaMercanciaReporteExcel = async (req, res) => {
                     row.clave_ped, 
                     row.fecha_en,
                     row.fraccion || "N/A",
+                    row.subd || "N/A",
+                    row.met_val || "N/A",
+                    row.id_umc || "N/A",
                     row.cantidad_umc || "N/A",
-                    row.descripcion || "N/A"
+                    row.descripcion || "N/A",
+                    row.id_umt || "N/A",
+                    row.cantidad_umt || "N/A",
+                    row.precio_unit || "N/A",
                 ]);
                 currentPedimento = row.no_pedimento;
             } else {
@@ -170,7 +180,12 @@ export const entradaMercanciaReportePDF = async (req, res) => {
         res.status(500).json({ error: "Error interno del servidor" });
     }
 };
+
+
 export const salidaMercanciaReporteExcel = async (req, res) => {
+    //const data = req.query;
+    //console.log("Datos recibidos:", JSON.stringify(data, null, 2));
+
     try {
         const { id_empresa, id_domicilio , fechaInicio, fechaFin } = req.query;
         if (!id_empresa || !id_domicilio) {
@@ -180,10 +195,10 @@ export const salidaMercanciaReporteExcel = async (req, res) => {
         const queryDatosGenerales = `
             SELECT 
                 razon_social, 
-                rfc_empresa,
+                rfc,
                 no_immex
             FROM 
-                info_empresa
+                empresa
             WHERE 
                 id_empresa = $1;
         `;
@@ -193,11 +208,11 @@ export const salidaMercanciaReporteExcel = async (req, res) => {
         // Consultar domicilio
         const queryDom = `
             SELECT 
-                domicilio
+                texto
             FROM 
-                domicilios
+                domicilio
             WHERE 
-                id_empresa = $1 AND tipo_de_domicilio = 1;
+                id_empresa = $1 AND id_tipo_domicilio = 2;
         `;
         const valuesDom = [id_empresa];
         const { rows: domicilioData } = await pool.query(queryDom, valuesDom);
@@ -210,7 +225,7 @@ export const salidaMercanciaReporteExcel = async (req, res) => {
                 TO_CHAR(e.feca_sal, 'YYYY-MM-DD') AS fecha_en
             FROM 
                 pedimento p
-            JOIN encabezado_p_pedimento e ON p.no_pedimento = e.no_pedimento
+            JOIN pedimento_encabezado e ON p.no_pedimento = e.no_pedimento
             WHERE p.id_empresa = $1 
             AND p.id_domicilio = $2 
             AND p.tipo_oper = 'EXP'
@@ -230,9 +245,9 @@ export const salidaMercanciaReporteExcel = async (req, res) => {
 
         // **Agregar datos generales en las primeras filas**
         worksheet.addRow(["Empresa:", datosGenerales[0]?.razon_social || "N/A"]);
-        worksheet.addRow(["RFC:", datosGenerales[0]?.rfc_empresa || "N/A"]);
+        worksheet.addRow(["RFC:", datosGenerales[0]?.rfc || "N/A"]);
         worksheet.addRow(["Número IMMEX:", datosGenerales[0]?.no_immex || "N/A"]);
-        worksheet.addRow(["Domicilio:", domicilioData[0]?.domicilio || "N/A"]);
+        worksheet.addRow(["Domicilio:", domicilioData[0]?.texto || "N/A"]);
         worksheet.addRow([]); // Fila en blanco para separación
 
         // **Definir encabezados de la tabla**
@@ -261,6 +276,8 @@ export const salidaMercanciaReporteExcel = async (req, res) => {
         res.status(500).json({ error: "Error interno del servidor" });
     }
 };
+
+
 export const saldoMuestraReporteExcel = async (req, res) => {
     try {
         const { id_empresa, id_domicilio, selector } = req.query;
@@ -404,9 +421,9 @@ export const saldoMuestraReporteExcel = async (req, res) => {
         const worksheet = workbook.addWorksheet("Saldo");
 
         worksheet.addRow(["Empresa:", datosGenerales[0]?.razon_social || "N/A"]);
-        worksheet.addRow(["RFC:", datosGenerales[0]?.rfc_empresa || "N/A"]);
+        worksheet.addRow(["RFC:", datosGenerales[0]?.rfc || "N/A"]);
         worksheet.addRow(["IMMEX:", datosGenerales[0]?.no_immex || "N/A"]);
-        worksheet.addRow(["Domicilio:", domicilioData[0]?.domicilio || "N/A"]);
+        worksheet.addRow(["Domicilio:", domicilioData[0]?.texto || "N/A"]);
         worksheet.addRow([]);
 
         // Encabezados dinámicos
@@ -459,6 +476,52 @@ export const saldoMuestraReporteExcel = async (req, res) => {
         });
     }
 };
+export const saldoGrafica = async (req, res) => {
+    try {
+        const { id_empresa, id_domicilio, no_pedimento } = req.query;
+
+        if (!id_empresa || !id_domicilio || !no_pedimento) {
+            return res.status(400).json({
+                error: "Faltan parámetros obligatorios"
+            });
+        }
+
+        const { rows } = await pool.query(`
+            SELECT 
+                SUM(s.cant_total) AS total,
+                SUM(COALESCE(r.cant_restante, s.cant_total)) AS restante,
+                SUM(s.cant_total - COALESCE(r.cant_restante, s.cant_total)) AS gastado
+            FROM suma s
+            INNER JOIN pedimento p 
+                ON p.no_pedimento = s.no_pedimento
+            LEFT JOIN LATERAL (
+                SELECT cant_restante
+                FROM resta_suma_mu
+                WHERE idd_suma = s.id_suma
+                ORDER BY id_resta DESC
+                LIMIT 1
+            ) r ON true
+            WHERE p.id_empresa = $1
+            AND p.id_domicilio = $2
+            AND p.no_pedimento = $3
+            AND p.tipo_oper = 'IMP'
+            AND s.estado = '1';
+        `, [id_empresa, id_domicilio, no_pedimento]);
+
+        const result = rows[0];
+
+        res.json({
+            total: Number(result.total) || 0,
+            restante: Number(result.restante) || 0,
+            gastado: Number(result.gastado) || 0
+        });
+
+    } catch (error) {
+        console.error("Error en gráfica:", error);
+        res.status(500).json({ error: "Error en gráfica" });
+    }
+};
+
 export const mateUtilizadosReporteExcel = async (req, res) => {
     try {
         const { id_empresa, id_domicilio, fechaInicio, fechaFin } = req.query;
