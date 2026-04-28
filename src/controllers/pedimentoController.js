@@ -94,3 +94,26 @@ export const verPedimentoCompleto = async (req, res) => {
         res.status(500).json({ error: "Error interno del servidor" });
     }
 };
+
+export const verMateProDesc = async (req, res) => {
+    const { id_producto } = req.query;
+    //const data = req.query;
+    //console.log("Datos recibidos:", JSON.stringify(data, null, 2));
+    try {
+        const { rows } = await pool.query(`
+            SELECT 
+                mu.id_material,
+                m.id_material_interno,
+                mu.cantidad
+            FROM bom mu
+            JOIN material m 
+                ON mu.id_material = m.id_material
+            WHERE mu.id_producto = $1;
+        `, [id_producto]);
+
+        res.json(rows);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Error al obtener detalle del producto" });
+    }
+};

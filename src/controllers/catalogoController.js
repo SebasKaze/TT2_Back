@@ -223,7 +223,7 @@ export const verProductos = async (req, res) =>{
     try {
         const { rows } = await pool.query(`
             SELECT 
-                id_producto_interno, fraccion_arancelaria, nombre_interno, descripcion, id_unidad, subd
+                id_producto, id_producto_interno, fraccion_arancelaria, nombre_interno, descripcion, id_unidad, subd
             FROM 
                 producto
             WHERE 

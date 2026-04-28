@@ -41,13 +41,13 @@ export const entradaMercanciaReporteExcel = async (req, res) => {
             SELECT 
                 p.no_pedimento, 
                 p.clave_ped,
+                e.valor_dolares,
+                e.valor_aduana,
                 TO_CHAR(e.feca_sal, 'YYYY-MM-DD') AS fecha_en,
                 pa.fraccion,pa.subd,pa.met_val,pa.id_umc,
                 pa.cantidad_umc,
                 pa.descripcion,
                 pa.id_umt,pa.cantidad_umt,pa.precio_unit
-
-
 
             FROM 
                 pedimento p
@@ -82,7 +82,7 @@ export const entradaMercanciaReporteExcel = async (req, res) => {
         worksheet.addRow([]); // Fila en blanco para separación
 
         // Definir encabezados de la tabla
-        const headers = ["Pedimento", "Clave de pedimento", "Fecha", "Fracción","subd","met_val", "id_umc","Cantidad UMC", "Descripcion","id_umt","cantidad_umt","precio_unit"];
+        const headers = ["Pedimento", "Clave de pedimento", "Fecha", "Valor en dolares", "Valor en dolares", "Fracción","subd","met_val", "id_umc","Cantidad UMC", "Descripcion","id_umt","cantidad_umt","precio_unit"];
         worksheet.addRow(headers).font = { bold: true };
 
         // Agregar filas con los datos de la tabla
@@ -95,6 +95,8 @@ export const entradaMercanciaReporteExcel = async (req, res) => {
                     row.no_pedimento, 
                     row.clave_ped, 
                     row.fecha_en,
+                    row.valor_dolares,
+                    row.valor_aduana,
                     row.fraccion || "N/A",
                     row.subd || "N/A",
                     row.met_val || "N/A",
@@ -109,10 +111,16 @@ export const entradaMercanciaReporteExcel = async (req, res) => {
             } else {
                 // Si es la misma pedimento pero con otra partida, solo mostramos los datos de la partida
                 worksheet.addRow([
-                    "", "", "",
+                    "", "", "","","",
                     row.fraccion || "N/A",
+                    row.subd || "N/A",
+                    row.met_val || "N/A",
+                    row.id_umc || "N/A",
                     row.cantidad_umc || "N/A",
-                    row.descripcion || "N/A"
+                    row.descripcion || "N/A",
+                    row.id_umt || "N/A",
+                    row.cantidad_umt || "N/A",
+                    row.precio_unit || "N/A",
                 ]);
             }
         });
@@ -185,12 +193,12 @@ export const entradaMercanciaReportePDF = async (req, res) => {
 export const salidaMercanciaReporteExcel = async (req, res) => {
     //const data = req.query;
     //console.log("Datos recibidos:", JSON.stringify(data, null, 2));
-
     try {
-        const { id_empresa, id_domicilio , fechaInicio, fechaFin } = req.query;
+        const { id_empresa, id_domicilio, fechaInicio, fechaFin } = req.query;
         if (!id_empresa || !id_domicilio) {
             return res.status(400).json({ error: "Faltan parámetros" });
         }
+
         // Consultar datos generales de la empresa
         const queryDatosGenerales = `
             SELECT 
@@ -217,15 +225,23 @@ export const salidaMercanciaReporteExcel = async (req, res) => {
         const valuesDom = [id_empresa];
         const { rows: domicilioData } = await pool.query(queryDom, valuesDom);
 
-        // Construcción dinámica del query
+        // Construcción dinámica del query con JOIN a partidas
         let query = `
             SELECT 
                 p.no_pedimento, 
                 p.clave_ped,
-                TO_CHAR(e.feca_sal, 'YYYY-MM-DD') AS fecha_en
+                e.valor_dolares,
+                e.valor_aduana,
+                TO_CHAR(e.feca_sal, 'YYYY-MM-DD') AS fecha_en,
+                pa.fraccion,pa.subd,pa.met_val,pa.id_umc,
+                pa.cantidad_umc,
+                pa.descripcion,
+                pa.id_umt,pa.cantidad_umt,pa.precio_unit
+
             FROM 
                 pedimento p
             JOIN pedimento_encabezado e ON p.no_pedimento = e.no_pedimento
+            LEFT JOIN partida pa ON p.no_pedimento = pa.no_pedimento
             WHERE p.id_empresa = $1 
             AND p.id_domicilio = $2 
             AND p.tipo_oper = 'EXP'
@@ -237,25 +253,65 @@ export const salidaMercanciaReporteExcel = async (req, res) => {
             query += " AND e.fecha_en BETWEEN $3 AND $4";
             values.push(fechaInicio, fechaFin);
         }
+        
+        // Ordenar por número de pedimento para agrupar las partidas
+        query += " ORDER BY p.no_pedimento, pa.fraccion";
+        
         const { rows } = await pool.query(query, values);
 
         // Crear un libro de Excel
         const workbook = new ExcelJS.Workbook();
-        const worksheet = workbook.addWorksheet("SalidaMercancias");
+        const worksheet = workbook.addWorksheet("EntradaMercancias");
 
-        // **Agregar datos generales en las primeras filas**
+        // Agregar datos generales en las primeras filas
         worksheet.addRow(["Empresa:", datosGenerales[0]?.razon_social || "N/A"]);
         worksheet.addRow(["RFC:", datosGenerales[0]?.rfc || "N/A"]);
         worksheet.addRow(["Número IMMEX:", datosGenerales[0]?.no_immex || "N/A"]);
         worksheet.addRow(["Domicilio:", domicilioData[0]?.texto || "N/A"]);
         worksheet.addRow([]); // Fila en blanco para separación
 
-        // **Definir encabezados de la tabla**
-        worksheet.addRow(["Pedimento", "Clave de pedimento", "Fecha"]).font = { bold: true };
+        // Definir encabezados de la tabla
+        const headers = ["Pedimento", "Clave de pedimento", "Fecha", "Valor en dolares", "Valor en dolares", "Fracción","subd","met_val", "id_umc","Cantidad UMC", "Descripcion","id_umt","cantidad_umt","precio_unit"];
+        worksheet.addRow(headers).font = { bold: true };
 
-        // **Agregar filas con los datos de la tabla**
+        // Agregar filas con los datos de la tabla
+        let currentPedimento = null;
+        
         rows.forEach((row) => {
-            worksheet.addRow([row.no_pedimento, row.clave_ped, row.fecha_en]);
+            // Si es un nuevo pedimento, mostramos todos sus datos
+            if (row.no_pedimento !== currentPedimento) {
+                worksheet.addRow([
+                    row.no_pedimento, 
+                    row.clave_ped, 
+                    row.fecha_en,
+                    row.valor_dolares,
+                    row.valor_aduana,
+                    row.fraccion || "N/A",
+                    row.subd || "N/A",
+                    row.met_val || "N/A",
+                    row.id_umc || "N/A",
+                    row.cantidad_umc || "N/A",
+                    row.descripcion || "N/A",
+                    row.id_umt || "N/A",
+                    row.cantidad_umt || "N/A",
+                    row.precio_unit || "N/A",
+                ]);
+                currentPedimento = row.no_pedimento;
+            } else {
+                // Si es la misma pedimento pero con otra partida, solo mostramos los datos de la partida
+                worksheet.addRow([
+                    "", "", "","","",
+                    row.fraccion || "N/A",
+                    row.subd || "N/A",
+                    row.met_val || "N/A",
+                    row.id_umc || "N/A",
+                    row.cantidad_umc || "N/A",
+                    row.descripcion || "N/A",
+                    row.id_umt || "N/A",
+                    row.cantidad_umt || "N/A",
+                    row.precio_unit || "N/A",
+                ]);
+            }
         });
 
         // Configurar la respuesta para descarga
@@ -275,6 +331,9 @@ export const salidaMercanciaReporteExcel = async (req, res) => {
         console.error("Error al generar el archivo Excel:", error);
         res.status(500).json({ error: "Error interno del servidor" });
     }
+
+
+
 };
 
 
@@ -463,7 +522,7 @@ export const saldoMuestraReporteExcel = async (req, res) => {
         );
         res.setHeader(
             "Content-Disposition",
-            "attachment; filename=saldo_muestra.xlsx"
+            "attachment; filename=Saldos.xlsx"
         );
 
         await workbook.xlsx.write(res);

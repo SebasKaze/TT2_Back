@@ -288,6 +288,8 @@ export const editarPedimento = async (req, res) => {
 };
 
 export const activoFijo = async (req, res) => {
+    //const data = req.query;
+    //console.log("Datos recibidos:", JSON.stringify(data, null, 2));
     const { id_empresa, id_domicilio} = req.query;
     if (!id_empresa || !id_domicilio) {
         return res.status(400).json({ message: "Faltan parámetros requeridos." });
@@ -295,7 +297,7 @@ export const activoFijo = async (req, res) => {
     try {
         const { rows } = await pool.query(`
             SELECT 
-                id_activo_fijo_interno, nombre, fraccion_arancelaria, ubi_interna, descripcion
+                id_activo_fijo_interno, nombre, fraccion_arancelaria, ubi_interna, descripcion, no_pedimento
             FROM 
                 activo_fijo
             WHERE 
@@ -436,7 +438,9 @@ export const consultaPedimento = async (req, res) => {
     }
 };
 
-export const pedimentoAf = async (req,res) => {
+export const pedimentoAf = async (req,res) => { 
+    //const data = req.query;
+    //console.log("Datos recibidos:", JSON.stringify(data, null, 2));
     const { id_empresa, id_domicilio} = req.query;
         if (!id_empresa || !id_domicilio) {
         return res.status(400).json({ message: "Faltan parámetros requeridos." });
