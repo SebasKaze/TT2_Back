@@ -7,6 +7,7 @@ import {
     verDomicilios,
     consultaPedimento,
     pedimentoAf,
+    cargarAF
 
 } from "../controllers/cargasController.js";
 
@@ -30,5 +31,7 @@ router.get("/api/activofijo",activoFijo);
 router.get("/api/verDomicilios", verDomicilios ); //Mostrar domicilios
 router.get("/api/consultaPedimento/:no_pedimento", consultaPedimento); // Consultar pedimento por no_pedimento
 router.get("/api/pedimentoAf/activofijo", pedimentoAf);
+
+router.post("/api/cargaaf",cargarAF);
 
 export default router;

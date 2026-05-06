@@ -8,6 +8,7 @@ import {
     InfoDomi,
     RegistroUsuario,
     verDomi,
+    ActualizarUsuario,
 } from "../controllers/empresaController.js";
 
 const router = express.Router();
@@ -16,7 +17,7 @@ const router = express.Router();
 router.post("/api/registrarempresa", RegistroEmpresa);
 router.post("/api/registrosdomi", RegistroDomi);
 router.post("/api/registrousuario", RegistroUsuario);
-
+router.post("/api/datosGenerales/actualizarUsuario",ActualizarUsuario);
 
 router.post("/api/datosGenerales/usuario", DatosGeneralesUsuario); // Ver datos generales
 router.post("/api/datosGenerales/empresa", DatosGeneralesEmpresa); // Ver datos generales

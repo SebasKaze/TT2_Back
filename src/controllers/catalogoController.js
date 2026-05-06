@@ -3,7 +3,6 @@ import pool from "../config/db.js";
 //MATERIALES
 export const cargaMaterial = async (req,res)=>{
     try{
-
         //const data = req.body;
         //console.log("Datos recibidos CARGA_MATERIAL:", JSON.stringify(data, null, 2));
         
@@ -11,7 +10,7 @@ export const cargaMaterial = async (req,res)=>{
         const envioMaterial = req.body;
         const envioMaterialQuery = `
             INSERT INTO material
-            (id_material_interno, fraccion_arancelaria, id_empresa, nombre_interno, descripcion_fraccion,id_unidad,id_domicilio, subd)
+            (id_material_interno, fraccion_arancelaria, id_empresa, nombre_interno, descripcion_fraccion,unidadmedida,id_domicilio, subd)
             VALUES 
             ($1, $2, $3, $4, $5, $6, $7, $8)
             RETURNING *;
@@ -22,7 +21,7 @@ export const cargaMaterial = async (req,res)=>{
             envioMaterial.id_empresa,
             envioMaterial.nombreFracc,
             envioMaterial.descripcionFraccion,
-            1,
+            envioMaterial.unidadMedida,
             envioMaterial.id_domicilio,
             envioMaterial.subd,
         ];
@@ -48,7 +47,7 @@ export const verMateriales = async (req, res) =>{
     try {
         const { rows } = await pool.query(`
             SELECT 
-                id_material_interno, fraccion_arancelaria, nombre_interno, descripcion_fraccion, id_unidad, subd
+                id_material_interno, fraccion_arancelaria, nombre_interno, descripcion_fraccion, unidadmedida, subd
             FROM 
                 material
             WHERE 
@@ -152,7 +151,7 @@ export const cargaProducto = async (req,res)=>{
         const envioProducto = req.body;
         const envioProductoQuery = `
             INSERT INTO producto
-            (id_producto_interno, fraccion_arancelaria, id_empresa, nombre_interno, descripcion,id_unidad, id_domicilio, subd)
+            (id_producto_interno, fraccion_arancelaria, id_empresa, nombre_interno, descripcion,unidadmedida, id_domicilio, subd)
             VALUES 
             ($1, $2, $3, $4, $5, $6, $7, $8)
             RETURNING *;
@@ -163,7 +162,7 @@ export const cargaProducto = async (req,res)=>{
             envioProducto.id_empresa,
             envioProducto.nombre,
             envioProducto.descripcion,
-            1,
+            envioProducto.unidadMedida,
             envioProducto.id_domicilio,
             envioProducto.subd,
         ];
@@ -223,7 +222,7 @@ export const verProductos = async (req, res) =>{
     try {
         const { rows } = await pool.query(`
             SELECT 
-                id_producto, id_producto_interno, fraccion_arancelaria, nombre_interno, descripcion, id_unidad, subd
+                id_producto, id_producto_interno, fraccion_arancelaria, nombre_interno, descripcion, unidadmedida, subd
             FROM 
                 producto
             WHERE 

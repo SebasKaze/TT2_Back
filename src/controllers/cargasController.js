@@ -464,3 +464,64 @@ export const pedimentoAf = async (req,res) => {
         res.status(500).json({ error: "Error interno del servidor" });
     }
 }
+
+export const cargarAF = async (req,res) => { 
+    try{
+        //const data = req.body;
+        //console.log("Datos recibidos CARGA_MATERIAL:", JSON.stringify(data, null, 2));
+        const envioAF = req.body;
+        const envioAFQuery = `
+            INSERT INTO activo_fijo
+            (id_empresa, id_activo_fijo_interno, nombre, ubi_interna, descripcion,no_pedimento,id_domicilio, fraccion_arancelaria)
+            VALUES 
+            ($1, $2, $3, $4, $5, $6, $7, $8)
+            RETURNING *;
+        `; 
+        const envioAFDatos = [
+            envioAF.id_empresa,
+            envioAF.idInterno, 
+            envioAF.nombre_activofijo,
+            envioAF.ubicacion_interna,
+            envioAF.descripcion,
+            envioAF.pedimentoSeleccionado,
+            envioAF.id_domicilio,
+            envioAF.fraccion,
+        ];
+        await pool.query(envioAFQuery,envioAFDatos);
+        const data = "Datos Cargados";
+        res.json(data);
+        
+    }catch(error){
+        console.error("Error al insertar datos:", error);
+        if (!res.headersSent) {
+            return res.status(500).json({ error: "Error interno del servidor" });
+        }
+    }  
+
+
+/*
+    const { id_empresa, id_domicilio} = req.query;
+        if (!id_empresa || !id_domicilio) {
+        return res.status(400).json({ message: "Faltan parámetros requeridos." });
+    }
+    try {
+        const { rows } = await pool.query(`
+            SELECT 
+                no_pedimento
+            FROM 
+                pedimento
+            WHERE 
+                id_empresa = $1 
+                AND 
+                id_domicilio = $2
+                AND
+                clave_ped = 'AF'
+            `,[id_empresa,id_domicilio]);
+        res.json(rows);
+    } catch (error) {
+        console.error("Error al obtener datos:", error);
+        res.status(500).json({ error: "Error interno del servidor" });
+    }
+
+*/
+}

@@ -16,6 +16,12 @@ export const verPedimentoCompleto = async (req, res) => {
                     WHERE e.no_pedimento = p.no_pedimento
                 ),
 
+                'encabezadosec', (
+                    SELECT json_agg(encs)
+                    FROM encabezado_sec_pedimento encs
+                    WHERE encs.no_pedimento = p.no_pedimento
+                ),
+
                 'proveedores', (
                     SELECT json_agg(dpc)
                     FROM datos_proveedor_comprador dpc
@@ -86,7 +92,7 @@ export const verPedimentoCompleto = async (req, res) => {
         if (!rows || rows.length === 0 || !rows[0].pedimento_completo) {
             return res.status(404).json({ message: "Pedimento no encontrado" });
         }
-
+        //console.log("Datos del Pedimento:", JSON.stringify(rows[0].pedimento_completo, null, 2));
         res.json(rows[0].pedimento_completo);
 
     } catch (error) {
@@ -102,7 +108,7 @@ export const verMateProDesc = async (req, res) => {
     try {
         const { rows } = await pool.query(`
             SELECT 
-                mu.id_material,
+                mu.id_material,mu.merma_por,
                 m.id_material_interno,
                 mu.cantidad
             FROM bom mu
@@ -117,3 +123,24 @@ export const verMateProDesc = async (req, res) => {
         res.status(500).json({ error: "Error al obtener detalle del producto" });
     }
 };
+
+export const editarPedimento = async (req, res) => {
+    const data = req.body;
+    console.log("Datos recibidos:", JSON.stringify(data, null, 2));
+    //const { id_usuario, nombre, telefono } = req.body;
+    /*
+    try {
+        const { rows } = await pool.query(`
+            UPDATE  usuario
+            SET nombre = $2,  telefono =$3  
+            WHERE 
+                id_usuario = $1;`,
+            [id_usuario,nombre, telefono]);
+        res.json(rows);
+
+    } catch (error) {
+        console.error("Error al obtener datos:", error);
+        res.status(500).json({ error: "Error interno del servidor" });
+    }
+    */  
+};   

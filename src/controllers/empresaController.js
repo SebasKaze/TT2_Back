@@ -23,8 +23,32 @@ export const DatosGeneralesUsuario = async (req, res) => {
         res.status(500).json({ error: "Error interno del servidor" });
     }
 };
+export const ActualizarUsuario = async (req, res) => {
+    //console.log("Datos recibidos en el backend:", req.body); 
+    const { id_usuario, nombre, telefono } = req.body;
+
+    try {
+        const { rows } = await pool.query(`
+            UPDATE  usuario
+            SET nombre = $2,  telefono =$3  
+            WHERE 
+                id_usuario = $1;`,
+            [id_usuario,nombre, telefono]);
+        res.json(rows);
+
+    } catch (error) {
+        console.error("Error al obtener datos:", error);
+        res.status(500).json({ error: "Error interno del servidor" });
+    }
+        
+};
+
+
+
+
+
 export const DatosGeneralesEmpresa = async (req, res) => {
-    console.log("Datos recibidos en el backend:", req.body); // 👈 Añade esta línea
+    //console.log("Datos recibidos en el backend:", req.body); // 👈 Añade esta línea
     const { id_empresa } = req.body;
 
     try {
@@ -156,6 +180,7 @@ export const RegistroUsuario = async (req, res) => {
         const envioUsuario = req.body;
         //console.log("Datos recibidos REGISTRO_USER:", JSON.stringify(envioUsuario, null, 2));
         // Verificar si ya existe un usuario con el mismo correo
+        
         const correoExisteQuery = `SELECT 1 FROM usuario WHERE correo = $1`;
         const { rows } = await pool.query(correoExisteQuery, [envioUsuario.correo]);
 
