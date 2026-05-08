@@ -62,44 +62,66 @@ export const verMateriales = async (req, res) =>{
     }
 };
 
-export const editarMaterial = async (req,res) =>{
+export const editarMaterial = async (req, res) => {
     const data = req.body;
-    try{
+
+    console.log(
+        "Datos recibidos CARGA_MATERIAL:",
+        JSON.stringify(data, null, 2)
+    );
+
+    try {
         const { rows: MaterialID } = await pool.query(
-            'SELECT id_material FROM materiales_de_empresa WHERE id_material_interno = $1 AND id_domicilio =$2',
-            [data.id_material_interno, data.id_domicilio] 
+            `SELECT id_material 
+                FROM material 
+                WHERE id_material_interno = $1 
+                AND id_domicilio = $2 
+                AND id_empresa = $3`,
+            [
+                data.id_material_interno,
+                data.id_domicilio,
+                data.id_empresa,
+            ]
         );
 
-        if(MaterialID.length === 0){
-            return res.status(404).json({ message: "No se encontró el Producto." });
+        if (MaterialID.length === 0) {
+            return res
+                .status(404)
+                .json({ message: "No se encontró el material." });
         }
 
         const id_material = MaterialID[0].id_material;
-        const { rowCount } = await pool.query(
-            `SELECT 1 FROM billete_de_materiales WHERE id_material = $1`,
-            [id_material]
-        );
 
-        if (rowCount > 0) {
-            return res.status(400).json({ message: "No es posible actualizar. El material ya está registrado en Productos." });
-        }
-
-        const {rows} = await pool.query(
-            `UPDATE materiales_de_empresa SET fraccion_arancelaria = $1,nombre_interno = $2,
-            descripcion_fraccion = $3,unidad_medida = $4 WHERE id_material_interno=$5 AND id_domicilio=$6
-            RETURNING *`,
-            [data.fraccion_arancelaria,data.nombre_interno,data.descripcion_fraccion,data.unidad_medida,
-            data.id_material_interno, data.id_domicilio]
+        const { rows } = await pool.query(
+            `UPDATE material 
+                SET 
+                    nombre_interno = $1,
+                    descripcion_fraccion = $2,
+                    unidadmedida = $3
+                WHERE id_material = $4
+             RETURNING *`,
+            [
+                data.nombre_interno,
+                data.descripcion_fraccion,
+                data.unidadmedida,
+                id_material,
+            ]
         );
 
         if (rows.length === 0) {
-            return res.status(404).json({ message: "No se encontró el producto a actualizar." });
+            return res
+                .status(404)
+                .json({ message: "No se encontró el producto a actualizar." });
         }
 
-        return res.json(rows[0]);
-    }catch (error) {
+        res.json(rows[0]);
+
+    } catch (error) {
         console.error("Error al actualizar producto:", error);
-        return res.status(500).json({ message: "Error interno del servidor." });
+
+        return res
+            .status(500)
+            .json({ message: "Error interno del servidor." });
     }
 };
 

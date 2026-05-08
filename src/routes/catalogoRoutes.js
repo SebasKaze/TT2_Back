@@ -18,7 +18,7 @@ const router = express.Router();
 // MATERIALS
 router.post("/api/cargamateriales", cargaMaterial);
 router.get("/api/verMateriales", verMateriales);
-router.put("/api/editarmaterial/:id",editarMaterial);
+router.post("/api/editarmaterial",editarMaterial);
 router.delete("/api/eliminarmaterial/:id",eliminarMaterial);
 
 //PRODUCTO
