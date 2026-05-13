@@ -11,7 +11,7 @@ import procesosRoutes from "./routes/procesosRoutes.js"
 import reportesRoutes from "./routes/reportesRoutes.js"
 import pedimentoRoutes from "./routes/pedimentoRoutes.js"
 import cargaPDFRoutes from "./routes/cargaPDFRoutes.js"
-
+import graficasRoutes from "./routes/graficasRoutes.js"
 
 
 const app = express();
@@ -45,6 +45,8 @@ app.use(reportesRoutes);
 app.use(pedimentoRoutes);
 
 app.use(cargaPDFRoutes);
+
+app.use(graficasRoutes);
 
 app.listen(PORT, () => {
     console.log(`Servidor corriendo en puerto ${PORT}`);

@@ -15,6 +15,16 @@ export const entradaMercancia = async (req, res) => {
             SELECT 
                 p.no_pedimento, 
                 p.clave_ped,
+                e.regimen,
+                e.des_ori,
+                e.tipo_cambio,
+                e.peso_bruto,
+                e.aduana_e_s,
+                e.medio_transpo,
+                e.medio_transpo_arri,
+                e.medio_transpo_sali,
+                e.valor_dolares,
+                e.valor_aduana,
                 TO_CHAR(e.fecha_en, 'YYYY-MM-DD') AS fecha_en
             FROM 
                 pedimento p
@@ -45,6 +55,16 @@ export const salidaMercancias = async (req, res) => { // como odio JavaScript po
             SELECT 
                 p.no_pedimento, 
                 p.clave_ped,
+                e.regimen,
+                e.des_ori,
+                e.tipo_cambio,
+                e.peso_bruto,
+                e.aduana_e_s,
+                e.medio_transpo,
+                e.medio_transpo_arri,
+                e.medio_transpo_sali,
+                e.valor_dolares,
+                e.valor_aduana,
                 TO_CHAR(e.fecha_en, 'YYYY-MM-DD') AS fecha_en
             FROM 
                 pedimento p

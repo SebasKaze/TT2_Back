@@ -317,24 +317,116 @@ export const verPedimento = async (req, res) => {
         //const data = req.query;
         //console.log("Datos recibidos:", JSON.stringify(data, null, 2));
         
-        const { id_empresa, id_domicilio } = req.query;
-        const query = `
-        SELECT 
-            p.no_pedimento, 
-            p.tipo_oper,
-            TO_CHAR(e.fecha_en, 'YYYY-MM-DD') AS fecha_en
-        FROM 
-            pedimento p
-        JOIN 
-            pedimento_encabezado e ON p.no_pedimento = e.no_pedimento
-        WHERE 
-            p.id_empresa = $1 
-        AND p.id_domicilio = $2;
-        `;
-        const values = [id_empresa, id_domicilio];
-        const { rows } = await pool.query(query, values);
-        res.json(rows);
-        
+        const { id_empresa, id_domicilio, tipo_pedimento } = req.query;
+        if (tipo_pedimento === "1") {
+            const query = `
+                SELECT DISTINCT
+                    p.no_pedimento,
+                    p.tipo_oper,
+                    p.clave_ped,
+                    TO_CHAR(e.fecha_en, 'YYYY-MM-DD') AS fecha_en
+                FROM pedimento p
+                JOIN pedimento_encabezado e
+                    ON p.no_pedimento = e.no_pedimento
+                WHERE
+                    p.id_empresa = $1
+                AND p.id_domicilio = $2
+                AND EXISTS (
+                    SELECT 1
+                    FROM suma s
+                    JOIN resta_suma_mu r
+                        ON r.idd_suma = s.id_suma
+                    WHERE
+                        s.no_pedimento = p.no_pedimento
+                        AND s.estado = '1'
+                        AND r.cant_restante = s.cant_total
+                        AND (
+                            SELECT COUNT(*)
+                            FROM resta_suma_mu r2
+                            WHERE r2.idd_suma = s.id_suma
+                        ) = 1
+                );
+            `;
+            const values = [id_empresa, id_domicilio];
+            const { rows } = await pool.query(query, values);
+            res.json(rows);
+        }
+        if (tipo_pedimento === "2") {
+            const query = `
+                SELECT DISTINCT
+                    p.no_pedimento,
+                    p.tipo_oper,
+                    p.clave_ped,
+                    TO_CHAR(e.fecha_en, 'YYYY-MM-DD') AS fecha_en
+                FROM pedimento p
+                JOIN pedimento_encabezado e
+                    ON p.no_pedimento = e.no_pedimento
+                WHERE
+                    p.id_empresa = $1
+                AND p.id_domicilio = $2
+                AND EXISTS (
+                    SELECT 1
+                    FROM suma s
+                    WHERE
+                        s.no_pedimento = p.no_pedimento
+                        AND s.estado = '1'
+                        AND (
+                            SELECT COUNT(*)
+                            FROM resta_suma_mu r
+                            WHERE r.idd_suma = s.id_suma
+                        ) > 1
+                );
+            `;
+            const values = [id_empresa, id_domicilio];
+            const { rows } = await pool.query(query, values);
+            res.json(rows);
+        }
+        if (tipo_pedimento === "3") {
+            const query = `
+                SELECT DISTINCT
+                    p.no_pedimento,
+                    p.tipo_oper,
+                    p.clave_ped,
+                    TO_CHAR(e.fecha_en, 'YYYY-MM-DD') AS fecha_en
+                FROM pedimento p
+                JOIN pedimento_encabezado e
+                    ON p.no_pedimento = e.no_pedimento
+                WHERE
+                    p.id_empresa = $1
+                AND p.id_domicilio = $2
+                AND EXISTS (
+                    SELECT 1
+                    FROM suma s
+                    WHERE
+                        s.no_pedimento = p.no_pedimento
+                        AND s.estado = '2'
+                );
+            `;
+
+            const values = [id_empresa, id_domicilio];
+            const { rows } = await pool.query(query, values);
+            res.json(rows);
+        }
+        if(tipo_pedimento === "4"){
+            const query = `
+                SELECT 
+                    p.no_pedimento, 
+                    p.tipo_oper,
+                    p.clave_ped,
+                    TO_CHAR(e.fecha_en, 'YYYY-MM-DD') AS fecha_en
+                FROM 
+                    pedimento p
+                JOIN 
+                    pedimento_encabezado e ON p.no_pedimento = e.no_pedimento
+                WHERE 
+                    p.id_empresa = $1 
+                AND p.id_domicilio = $2;
+                `;
+            const values = [id_empresa, id_domicilio];
+            const { rows } = await pool.query(query, values);
+            res.json(rows);
+        }
+
     } catch (error) {
         console.error("Error al obtener datos:", error);
         res.status(500).json({ error: "Error interno del servidor" });
